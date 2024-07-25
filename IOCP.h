@@ -3,9 +3,7 @@
 
 namespace IOCP
 {
-    constexpr auto DATA_BUFSIZE = 8192;
-    inline constexpr auto OVERLAPPED_TYPES=3;
-    enum OVERLAPPED_TYPE { RECV,SEND,CONNECT};
+
 }
 
 

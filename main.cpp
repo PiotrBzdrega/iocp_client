@@ -8,7 +8,7 @@
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5j.html */
 /* https://www.codeproject.com/Articles/10330/A-simple-IOCP-Server-Client-Class */
 /* https://www.codeproject.com/Articles/14462/Build-your-own-cryptographically-safe-server-clien */
-/*goal https://famellee.wordpress.com/2013/02/20/use-openssl-with-io-completion-port-and-certificate-signing/*/
+/*goal https://famellee.wordpress.com/2013/02/20/use-openssl-with-io-completion-port-and-certificate-signing/ */
 
 
 /*
