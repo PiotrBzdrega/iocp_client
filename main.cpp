@@ -126,7 +126,7 @@ int main()
     }
 
 
-    DWORD BytesTransferred;  
+    DWORD BytesTransferred{};  
     DataContext PerHandleData(clientSocket);
     // LPPER_IO_DATA PerIoData;
     LPOVERLAPPED lpOverlapped{nullptr};
@@ -138,18 +138,39 @@ int main()
     while (1)
     {
         /*  Can be related to many threads */
-        if(!GetQueuedCompletionStatus(IOCP_handle, &BytesTransferred,&CompletionKey/*(PULONG_PTR)&PerHandleData*/, &lpOverlapped /*(LPOVERLAPPED *) &PerIoData*/ , INFINITE))
+        auto complStatus=GetQueuedCompletionStatus(IOCP_handle, &BytesTransferred,&CompletionKey/*(PULONG_PTR)&PerHandleData*/, &lpOverlapped /*(LPOVERLAPPED *) &PerIoData*/ , INFINITE);
+
+
+        if(complStatus == 0 )
         {
-            std::cout<<"GetQueuedCompletionStatus:"<<WSA::ErrToString(GetLastError())<<"\n";
-            closesocket(clientSocket);
-            /* release completion port */
-            CloseHandle(IOCP_handle);
-            return EXIT_FAILURE;
+            if (lpOverlapped == nullptr)
+            {
+                /* This usually indicates an error in the parameters to GetQueuedCompletionStatus. */
+                std::cout<<"GetQueuedCompletionStatus:"<<WSA::ErrToString(GetLastError())<<"\n";
+                closesocket(clientSocket);
+                /* release completion port */
+                CloseHandle(IOCP_handle);
+                return EXIT_FAILURE;
+            }
+            else
+            {
+                /*The thread must deal with the data (possibly freeing any associated buffers), 
+                but there is an error condition on the underlying HANDLE. 
+                Usually seen when the other end of a network connection has been forcibly closed, 
+                but there's still data in the send or receive queue.*/
+                std::cout<<"GetQueuedCompletionStatus:"<<WSA::ErrToString(GetLastError())<<"\n";
+                closesocket(clientSocket);
+                /* release completion port */
+                // CloseHandle(IOCP_handle); // 
+                return EXIT_FAILURE;
+            }
+            
+
         }
         context=(DataContext*)(lpOverlapped);
         std::cout<<std::string(context->buffer,BytesTransferred)<<"\n";
-        int a=8;
-        a=a;
+
+
 
         std::memset(context->buffer,0, sizeof(context->buffer));
         // Post an asynchronous read operation
