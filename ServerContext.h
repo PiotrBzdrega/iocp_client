@@ -1,8 +1,9 @@
 #pragma once
 
 #include <array>
-#include "IOCP.h"
-#include <winsock2.h>
+#include <winsock2.h> //WSABUF
+#include <cstdint> //uint16_t
+#include <string>
 
 
 namespace IOCP
@@ -22,28 +23,20 @@ namespace IOCP
 
     class ServerContext
     {
-    private:
+    public:
+        ServerContext(std::string ip, uint16_t port);
+        std::string _ip;
+        uint16_t _port;
+        SOCKET socket;
         std::array<char[BUFSIZE],ASYNC_RW> _buffer;
         std::array<WSABUF,ASYNC_RW> _asyncBuffer;
         std::array<AsyncResult,ASYNC_TYPES> _asyncRes;
-    public:
-        ServerContext(/* args */)
-        {
-            /* assign pointer to the current object instance */
-            for (auto &i : _asyncRes)
-            {
-               i.context=this;
-            }
+    private:
 
-            /* copy out addresses of buffers */
-            _asyncBuffer[RECV].buf=_buffer[RECV];
-            _asyncBuffer[RECV].len=BUFSIZE;
 
-            _asyncBuffer[SEND].buf=_buffer[SEND];
-            _asyncBuffer[SEND].len=0;
+        void bondAsync();
+        void connect();
 
-        };
-        ~ServerContext();
     };
 
 

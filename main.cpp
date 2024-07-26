@@ -1,8 +1,11 @@
 #include <iostream>
 #include <cstring> //std::memset
+#include <vector>
+
 #include "WinSockInit.h"
 #include "DataContext.h"
-// #include "IOCP.h"
+#include "ServerContext.h"
+#include "IOCP.h"
 
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5i.html */
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5j.html */
@@ -55,6 +58,9 @@ int main()
 
     /* Initialize WinSock*/
     auto& winsock = WinSock::instance();
+
+    /* singlton*/
+    auto& iocp = IOCP::IOCP::instance(); //TODO: find best design 
 
     /* Creates an input/output (I/O) completion port w/o reference to socket */
     HANDLE IOCP_handle = CreateIoCompletionPort( INVALID_HANDLE_VALUE,NULL, 0, 0);
@@ -161,7 +167,7 @@ int main()
                 std::cout<<"GetQueuedCompletionStatus:"<<WSA::ErrToString(GetLastError())<<"\n";
                 closesocket(clientSocket);
                 /* release completion port */
-                // CloseHandle(IOCP_handle); // 
+                // CloseHandle(IOCP_handle); //do not stop 
                 return EXIT_FAILURE;
             }
             
