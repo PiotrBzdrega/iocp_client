@@ -4,8 +4,10 @@
 
 #include "WinSockInit.h"
 #include "DataContext.h"
-#include "ServerContext.h"
-#include "IOCP.h"
+#include "ServInfo.h"
+#include <mswsock.h> 
+// #include "ServerContext.h"
+// #include "IOCP.h"
 
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5i.html */
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5j.html */
@@ -49,8 +51,13 @@ WSAEventSelect(FD_ACCEPT)
 WSAWaitForMultipleEvents()
 WSAEnumNetworkEvents()
 WSAAccept()
-*/
 
+
+
+2024.07.28
+It is not possible to return WSAConnect result in GetQueuedCompletionStatus so i will try to use CONNECTEX with 0bytes
+
+*/
 
 int main()
 {
@@ -59,8 +66,8 @@ int main()
     /* Initialize WinSock*/
     auto& winsock = WinSock::instance();
 
-    /* singlton*/
-    auto& iocp = IOCP::IOCP::instance(); //TODO: find best design 
+    /* IOCP singlton instance */
+    // auto& iocp = IOCP::IOCP::instance(); //TODO: find best design 
 
     /* Creates an input/output (I/O) completion port w/o reference to socket */
     HANDLE IOCP_handle = CreateIoCompletionPort( INVALID_HANDLE_VALUE,NULL, 0, 0);
@@ -70,14 +77,21 @@ int main()
         return EXIT_FAILURE;
     }
 
-    /* create socket for client */
-    SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if (clientSocket == INVALID_SOCKET)
-    {
-        std::cout<<"socket:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
-        closesocket(clientSocket);
+    // Create a socket
+    SOCKET clientSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
+    if (clientSocket == INVALID_SOCKET) {
+        std::cerr << "Error at socket(): " << WSAGetLastError() << "\n";
         return EXIT_FAILURE;
     }
+
+    // /* create socket for client */
+    // SOCKET clientSocket = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+    // if (clientSocket == INVALID_SOCKET)
+    // {
+    //     std::cout<<"socket:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
+    //     closesocket(clientSocket);
+    //     return EXIT_FAILURE;
+    // }
 
     auto on = 1;
     if(setsockopt(clientSocket,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,(char *)&on,sizeof(on))) /* The SO_EXCLUSIVEADDRUSE option prevents other sockets from being forcibly bound to the same address and port */
@@ -88,22 +102,11 @@ int main()
         return EXIT_FAILURE;
     }
 
-    SOCKADDR_IN SockAddr{0};
-	SockAddr.sin_family = AF_INET;
-	SockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	SockAddr.sin_port = htons(1234);
-
-    /* connect to server on given address */
-    if (connect(clientSocket,(sockaddr*)&SockAddr, sizeof(SockAddr)) == SOCKET_ERROR &&
-		WSAGetLastError() != WSAEWOULDBLOCK)
-    {
-        std::cout<<"connect:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
-        closesocket(clientSocket);
-        /* release completion port */
-        return EXIT_FAILURE;
-    }
-
     DataContext *clientContext = new DataContext(clientSocket);
+
+	DWORD dwRetBytes = 0;
+	GUID guid = WSAID_CONNECTEX;
+    LPFN_CONNECTEX lpfnConnectEx = nullptr;
 
     /* Appends reference to socket in completion port */
     IOCP_handle = CreateIoCompletionPort((HANDLE)clientContext->socket, IOCP_handle, 0, 0);
@@ -114,23 +117,101 @@ int main()
         return EXIT_FAILURE;
     }
 
-    // Initialize the WSABUF structure
-    clientContext->wsabuf.buf = clientContext->buffer;
-    clientContext->wsabuf.len = sizeof(clientContext->buffer);
+   // Load ConnectEx function
+    WSAIoctl(clientContext->socket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &lpfnConnectEx, sizeof(lpfnConnectEx), &dwRetBytes, NULL, NULL);
 
-    // Post an asynchronous read operation
-    DWORD flags = 0;
-    if (WSARecv(clientContext->socket, &clientContext->wsabuf, 1, &clientContext->bytesReceived, &flags, &clientContext->overlapped, NULL) == SOCKET_ERROR) 
+    if (lpfnConnectEx == nullptr) 
     {
-        if (WSAGetLastError() != WSA_IO_PENDING) {
-            std::cerr << "WSARecv failed: " <<WSA::ErrToString(WSAGetLastError()) << "\n";
-            closesocket(clientSocket);
-            /* release completion port */
+        std::cerr << "WSAIoctl failed:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
+        closesocket(clientContext->socket);
+        return EXIT_FAILURE;
+    }   
+
+    SOCKADDR_IN SockAddr{0};
+	SockAddr.sin_family = AF_INET;
+	SockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	SockAddr.sin_port = htons(1234);
+
+    if (!lpfnConnectEx(clientContext->socket, (sockaddr*)&SockAddr, sizeof(SockAddr), NULL, 0, NULL, &clientContext->overlapped)) 
+    {
+        int err;
+        if ( (err = WSAGetLastError()) != ERROR_IO_PENDING) 
+        {
+            std::cerr << "ConnectEx failed:"<<WSA::ErrToString(err)<<"\n";
+            closesocket(clientContext->socket);
+            delete clientContext;
             CloseHandle(IOCP_handle);
             return EXIT_FAILURE;
         }
     }
 
+
+    // /* to ensure all fields are set to default values (0 or NULL for pointers) */    
+    // struct addrinfo hints = {0}; 
+    // {
+    //     hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+    //     hints.ai_socktype = SOCK_STREAM; /* TCP */
+    //     hints.ai_protocol = IPPROTO_TCP; //TODO: not sure if needed for Windows , for X can be omited
+    //     // hints.ai_flags = AI_PASSIVE; //TODO: not sure if needed for Windows , for X can be omited
+    // } 
+
+    // Servinfo servinfo;
+    // /* Translate name of a service location and/or a service name to set of socket addresses*/
+    // if(getaddrinfo(  "127.0.0.1", //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
+    //                         "1234", /* e.g. "http" or port number  */
+    //                         &hints, /* prepared socket address structure*/
+    //                         &servinfo) /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
+    // )
+    // {
+    //     std::cout<<"getaddrinfo:"<<WSA::ErrToString(GetLastError())<<"\n";
+    //     closesocket(clientSocket);
+    //     CloseHandle(IOCP_handle);
+    // }
+
+    // struct addrinfo *ptr = servinfo;
+
+    // // Initiate a non-blocking connect operation
+    // if (WSAConnect(clientContext->socket, ptr->ai_addr, (int)ptr->ai_addrlen, NULL, NULL, NULL, NULL) == SOCKET_ERROR) {
+    //     if (WSAGetLastError() != WSA_IO_PENDING) {
+    //         std::cerr << "WSAConnect failed.\n";
+    //         closesocket(clientContext->socket);
+    //         CloseHandle(IOCP_handle);
+    //         return EXIT_FAILURE;
+    //     }
+    // }
+
+    // SOCKADDR_IN SockAddr{0};
+	// SockAddr.sin_family = AF_INET;
+	// SockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	// SockAddr.sin_port = htons(1234);
+
+    // /* connect to server on given address */
+    // if (connect(clientSocket,(sockaddr*)&SockAddr, sizeof(SockAddr)) == SOCKET_ERROR &&
+	// 	WSAGetLastError() != WSAEWOULDBLOCK)
+    // {
+    //     std::cout<<"connect:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
+    //     closesocket(clientSocket);
+    //     /* release completion port */
+    //     return EXIT_FAILURE;
+    // }
+
+
+    // // Initialize the WSABUF structure
+    // clientContext->wsabuf.buf = clientContext->buffer;
+    // clientContext->wsabuf.len = sizeof(clientContext->buffer);
+
+    // // Post an asynchronous read operation
+    // DWORD flags = 0;
+    // if (WSARecv(clientContext->socket, &clientContext->wsabuf, 1, &clientContext->bytesReceived, &flags, &clientContext->overlapped, NULL) == SOCKET_ERROR) 
+    // {
+    //     if (WSAGetLastError() != WSA_IO_PENDING) {
+    //         std::cerr << "WSARecv failed: " <<WSA::ErrToString(WSAGetLastError()) << "\n";
+    //         closesocket(clientSocket);
+    //         /* release completion port */
+    //         CloseHandle(IOCP_handle);
+    //         return EXIT_FAILURE;
+    //     }
+    // }
 
     DWORD BytesTransferred{};  
     DataContext PerHandleData(clientSocket);
@@ -183,8 +264,9 @@ int main()
         DWORD flags = 0;
         if (WSARecv(context->socket, &context->wsabuf, 1, &context->bytesReceived, &flags, &context->overlapped, NULL) == SOCKET_ERROR) 
         {
-            if (WSAGetLastError() != WSA_IO_PENDING) {
-                std::cerr << "WSARecv failed: " << WSA::ErrToString(WSAGetLastError()) << "\n";
+            int err;
+            if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
+                std::cerr << "WSARecv failed: " << WSA::ErrToString(err) << "\n";
                 closesocket(clientSocket);
                 /* release completion port */
                 CloseHandle(IOCP_handle);

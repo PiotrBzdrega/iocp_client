@@ -1,7 +1,7 @@
 #pragma once
 
 #include <windows.h>
-
+#include <winsock2.h> 
 
 
 constexpr auto DATA_BUFSIZE = 8192;
