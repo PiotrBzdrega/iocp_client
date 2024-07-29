@@ -73,7 +73,7 @@ int main()
     HANDLE IOCP_handle = CreateIoCompletionPort( INVALID_HANDLE_VALUE,NULL, 0, 0);
     if (!IOCP_handle)
     {
-        std::cout<<"CreateIoCompletionPort:"<<WSA::ErrToString(GetLastError())<<"\n";
+        std::cout<<"CreateIoCompletionPort: "<<WSA::ErrToString(GetLastError())<<"\n";
         return EXIT_FAILURE;
     }
 
@@ -96,7 +96,7 @@ int main()
     auto on = 1;
     if(setsockopt(clientSocket,SOL_SOCKET,SO_EXCLUSIVEADDRUSE,(char *)&on,sizeof(on))) /* The SO_EXCLUSIVEADDRUSE option prevents other sockets from being forcibly bound to the same address and port */
     {
-        std::cout<<"setsockopt:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
+        std::cout<<"setsockopt: "<<WSA::ErrToString(WSAGetLastError())<<"\n";
         closesocket(clientSocket);
         /* release completion port */
         return EXIT_FAILURE;
@@ -112,32 +112,62 @@ int main()
     IOCP_handle = CreateIoCompletionPort((HANDLE)clientContext->socket, IOCP_handle, 0, 0);
     if (!IOCP_handle)
     {
-        std::cout<<"CreateIoCompletionPort:"<<WSA::ErrToString(GetLastError())<<"\n";
+        std::cout<<"CreateIoCompletionPort: "<<WSA::ErrToString(GetLastError())<<"\n";
         closesocket(clientSocket);
         return EXIT_FAILURE;
     }
 
    // Load ConnectEx function
-    WSAIoctl(clientContext->socket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid), &lpfnConnectEx, sizeof(lpfnConnectEx), &dwRetBytes, NULL, NULL);
+    auto ret=WSAIoctl(clientContext->socket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),&lpfnConnectEx, sizeof(lpfnConnectEx), &dwRetBytes, NULL, NULL);
 
-    if (lpfnConnectEx == nullptr) 
+    if (lpfnConnectEx == nullptr || ret) 
     {
-        std::cerr << "WSAIoctl failed:"<<WSA::ErrToString(WSAGetLastError())<<"\n";
+        std::cerr << "WSAIoctl failed: "<<WSA::ErrToString(WSAGetLastError())<<"\n";
         closesocket(clientContext->socket);
         return EXIT_FAILURE;
     }   
 
-    SOCKADDR_IN SockAddr{0};
-	SockAddr.sin_family = AF_INET;
-	SockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
-	SockAddr.sin_port = htons(1234);
+    // SOCKADDR_IN SockAddr{0};
+	// SockAddr.sin_family = AF_INET;
+	// SockAddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	// SockAddr.sin_port = htons(1234);
 
-    if (!lpfnConnectEx(clientContext->socket, (sockaddr*)&SockAddr, sizeof(SockAddr), NULL, 0, NULL, &clientContext->overlapped)) 
+    /* to ensure all fields are set to default values (0 or NULL for pointers) */    
+    struct addrinfo hints = {0}; 
+    {
+        hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+        hints.ai_socktype = SOCK_STREAM; /* TCP */
+        hints.ai_protocol = IPPROTO_TCP; //TODO: not sure if needed for Windows , for X can be omited
+        // hints.ai_flags = AI_PASSIVE; //TODO: not sure if needed for Windows , for X can be omited
+    } 
+
+    Servinfo servinfo;
+    /* Translate name of a service location and/or a service name to set of socket addresses*/
+    if(getaddrinfo(  "127.0.0.1", //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
+                            "1234", /* e.g. "http" or port number  */
+                            &hints, /* prepared socket address structure*/
+                            &servinfo) /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
+    )
+    {
+        std::cout<<"getaddrinfo:"<<WSA::ErrToString(GetLastError())<<"\n";
+        closesocket(clientSocket);
+        CloseHandle(IOCP_handle);
+    }
+
+    sockaddr_storage addr = {0};
+
+    for (addrinfo *p = servinfo; p != 0; p = p->ai_next)
+    {
+        memcpy_s(&addr, sizeof(addr), p->ai_addr, p->ai_addrlen);
+		break;
+    }
+
+    if (!lpfnConnectEx(clientContext->socket, (sockaddr*)&addr, sizeof(sockaddr_storage), 0, 0, 0, &clientContext->overlapped)) 
     {
         int err;
         if ( (err = WSAGetLastError()) != ERROR_IO_PENDING) 
         {
-            std::cerr << "ConnectEx failed:"<<WSA::ErrToString(err)<<"\n";
+            std::cerr << "ConnectEx failed: "<<WSA::ErrToString(err)<<"\n";
             closesocket(clientContext->socket);
             delete clientContext;
             CloseHandle(IOCP_handle);
@@ -233,7 +263,7 @@ int main()
             if (lpOverlapped == nullptr)
             {
                 /* This usually indicates an error in the parameters to GetQueuedCompletionStatus. */
-                std::cout<<"GetQueuedCompletionStatus:"<<WSA::ErrToString(GetLastError())<<"\n";
+                std::cout<<"GetQueuedCompletionStatus: "<<WSA::ErrToString(GetLastError())<<"\n";
                 closesocket(clientSocket);
                 /* release completion port */
                 CloseHandle(IOCP_handle);
@@ -245,7 +275,7 @@ int main()
                 but there is an error condition on the underlying HANDLE. 
                 Usually seen when the other end of a network connection has been forcibly closed, 
                 but there's still data in the send or receive queue.*/
-                std::cout<<"GetQueuedCompletionStatus:"<<WSA::ErrToString(GetLastError())<<"\n";
+                std::cout<<"GetQueuedCompletionStatus: "<<WSA::ErrToString(GetLastError())<<"\n";
                 closesocket(clientSocket);
                 /* release completion port */
                 // CloseHandle(IOCP_handle); //do not stop 

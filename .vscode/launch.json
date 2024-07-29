@@ -41,6 +41,7 @@
             "environment": [],
             "console":"internalConsole",
             "preLaunchTask": "C/C++: g++.exe build active file",
+            // "postDebugTask": ,
             "internalConsoleOptions": "openOnSessionStart"
         }
         
