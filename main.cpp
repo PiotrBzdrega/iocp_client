@@ -106,7 +106,7 @@ int main()
 
 	DWORD dwRetBytes = 0;
 	GUID guid = WSAID_CONNECTEX;
-    LPFN_CONNECTEX lpfnConnectEx = nullptr;
+    LPFN_CONNECTEX ConnectEx = nullptr;
 
     /* Appends reference to socket in completion port */
     IOCP_handle = CreateIoCompletionPort((HANDLE)clientContext->socket, IOCP_handle, 0, 0);
@@ -118,9 +118,9 @@ int main()
     }
 
    // Load ConnectEx function
-    auto ret=WSAIoctl(clientContext->socket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),&lpfnConnectEx, sizeof(lpfnConnectEx), &dwRetBytes, NULL, NULL);
+    auto ret=WSAIoctl(clientContext->socket, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid, sizeof(guid),&ConnectEx, sizeof(ConnectEx), &dwRetBytes, NULL, NULL);
 
-    if (lpfnConnectEx == nullptr || ret) 
+    if (ConnectEx == nullptr || ret) 
     {
         std::cerr << "WSAIoctl failed: "<<WSA::ErrToString(WSAGetLastError())<<"\n";
         closesocket(clientContext->socket);
@@ -135,7 +135,7 @@ int main()
     /* to ensure all fields are set to default values (0 or NULL for pointers) */    
     struct addrinfo hints = {0}; 
     {
-        hints.ai_family = AF_UNSPEC;     /* Allow IPv4 or IPv6 */
+        hints.ai_family = AF_INET,//AF_UNSPEC;     /* Allow IPv4 or IPv6 */
         hints.ai_socktype = SOCK_STREAM; /* TCP */
         hints.ai_protocol = IPPROTO_TCP; //TODO: not sure if needed for Windows , for X can be omited
         // hints.ai_flags = AI_PASSIVE; //TODO: not sure if needed for Windows , for X can be omited
@@ -143,7 +143,7 @@ int main()
 
     Servinfo servinfo;
     /* Translate name of a service location and/or a service name to set of socket addresses*/
-    if(getaddrinfo(  "127.0.0.1", //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
+    if(getaddrinfo(  "localhost",//"127.0.0.1", //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
                             "1234", /* e.g. "http" or port number  */
                             &hints, /* prepared socket address structure*/
                             &servinfo) /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
@@ -159,10 +159,12 @@ int main()
     for (addrinfo *p = servinfo; p != 0; p = p->ai_next)
     {
         memcpy_s(&addr, sizeof(addr), p->ai_addr, p->ai_addrlen);
+        
+        ret = bind(clientSocket, p->ai_addr, p->ai_addrlen);
 		break;
     }
 
-    if (!lpfnConnectEx(clientContext->socket, (sockaddr*)&addr, sizeof(sockaddr_storage), 0, 0, 0, &clientContext->overlapped)) 
+    if (!ConnectEx(clientContext->socket, (sockaddr*)&addr, sizeof(sockaddr_storage), 0, 0, 0, &clientContext->overlapped)) 
     {
         int err;
         if ( (err = WSAGetLastError()) != ERROR_IO_PENDING) 

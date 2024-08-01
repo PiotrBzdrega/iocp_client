@@ -13,7 +13,8 @@ namespace WSA
             FORMAT_MESSAGE_ALLOCATE_BUFFER | FORMAT_MESSAGE_FROM_SYSTEM | FORMAT_MESSAGE_IGNORE_INSERTS,
             NULL,
             errCode,
-            MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            // MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT),
+            MAKELANGID(LANG_ENGLISH, SUBLANG_DEFAULT),
             (LPTSTR)&messageBuffer,
             0,
             NULL

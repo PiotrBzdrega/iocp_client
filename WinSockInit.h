@@ -19,11 +19,23 @@ private:
         int res=WSAStartup(MAKEWORD(2,2), &wsaData);
         if (res)
         {
-            std::cout<<WSA::ErrToString(WSAGetLastError())<<"\n";
+            std::cout<<WSA::ErrToString(res)<<"\n";
 
             throw std::runtime_error("WSAStartup failed with error: "+res);
             /* WSACleanup should be called olny after succesfull call to WSAStartup */
         }
+
+    //     /* Confirm that the WinSock DLL supports 2.2.*/
+    //     if (LOBYTE(wsaData.wVersion) != 2 || HIBYTE(wsaData.wVersion) != 2) {
+    //     /* Tell the user that we could not find a usable */
+    //     /* WinSock DLL.                                  */
+    //     printf("Could not find a usable version of Winsock.dll\n");
+    //     WSACleanup();
+    // }
+    // else
+    //     printf("The Winsock 2.2 dll was found okay\n");
+
+
     }
 public:
     WinSock(const WinSock&) = delete;
