@@ -144,7 +144,7 @@ int main()
     Servinfo servinfo;
     /* Translate name of a service location and/or a service name to set of socket addresses*/
     if(getaddrinfo(  "localhost",//"127.0.0.1", //"172.22.64.1",  //"localhost", /* e.g. "www.example.com" or IP */
-                            "1234", /* e.g. "http" or port number  */
+                            "5234", /* e.g. "http" or port number  */
                             &hints, /* prepared socket address structure*/
                             &servinfo) /* pointer to sockaddr structure suitable for connecting, sending, binding to an IP/port pair*/
     )
@@ -154,17 +154,28 @@ int main()
         CloseHandle(IOCP_handle);
     }
 
+
+    struct sockaddr_in sa;
+    // Zero out the sockaddr_in structure
+    std::memset(&sa, 0, sizeof(sa));
+    sa.sin_family = AF_INET;  // IPv4
+    sa.sin_port = htons(1234);
+
+    /*  ConnectEx() requires that the socket be bound to an address
+	    with bind() before using, otherwise it will fail.
+        connect does it automatically */
+    ret = bind(clientContext->socket, (struct sockaddr*)&sa, sizeof(sa));
+
     sockaddr_storage addr = {0};
 
     for (addrinfo *p = servinfo; p != 0; p = p->ai_next)
     {
         memcpy_s(&addr, sizeof(addr), p->ai_addr, p->ai_addrlen);
         
-        ret = bind(clientSocket, p->ai_addr, p->ai_addrlen);
 		break;
     }
 
-    if (!ConnectEx(clientContext->socket, (sockaddr*)&addr, sizeof(sockaddr_storage), 0, 0, 0, &clientContext->overlapped)) 
+    if (!ConnectEx(clientContext->socket, (sockaddr*)&addr, sizeof(sockaddr_storage), NULL, 0, NULL, &clientContext->overlapped)) 
     {
         int err;
         if ( (err = WSAGetLastError()) != ERROR_IO_PENDING) 
@@ -283,9 +294,13 @@ int main()
                 // CloseHandle(IOCP_handle); //do not stop 
                 return EXIT_FAILURE;
             }
-            
+        }
+        if (&clientContext->overlapped==lpOverlapped)
+        {
+           std::cout<<"connected\n";
 
         }
+        
         context=(DataContext*)(lpOverlapped);
         std::cout<<std::string(context->buffer,BytesTransferred)<<"\n";
 
