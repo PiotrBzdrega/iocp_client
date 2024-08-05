@@ -24,5 +24,9 @@ void IOCP::ServerContext::bondAsync()
 
 void IOCP::ServerContext::connect()
 {
+    if (!ConnectEx)
+    {
+        /* code */
+    }
     
 }

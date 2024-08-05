@@ -30,12 +30,8 @@ IOCP::IOCP::~IOCP()
 }
 
 
-int IOCP::IOCP::associateHandle()
+int IOCP::IOCP::associateHandle(ServerContext serCtx)
 {
-    return 0;
-}
-
-int IOCP::IOCP::appendHandle()
-{
+    serCtx.
     return 0;
 }

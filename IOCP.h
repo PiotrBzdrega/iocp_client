@@ -11,8 +11,8 @@ namespace IOCP
     private:
         /* to create only once in instance() */
         IOCP();
-        HANDLE _handle;
-        std::vector<ServerContext> _endpoints;
+        static HANDLE _handle;
+        static std::vector<ServerContext> _endpoints;
         
     public:        
         IOCP(const IOCP&) = delete;
@@ -27,8 +27,7 @@ namespace IOCP
             return inst;
         };
 
-        static int associateHandle();
-        static int appendHandle();
+        static int associateHandle(ServerContext serCtx);        
     };
 }
 
