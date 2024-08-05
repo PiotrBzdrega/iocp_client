@@ -12,6 +12,7 @@
 // #include "ServerContext.h"
 // #include "IOCP.h"
 
+/* https://www.ulduzsoft.com/2014/01/practical-difference-between-epoll-and-windows-io-completion-ports-iocp/ */
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5i.html */
 /* https://www.winsocketdotnetworkprogramming.com/winsock2programming/winsock2advancediomethod5j.html */
 /* https://www.codeproject.com/Articles/10330/A-simple-IOCP-Server-Client-Class */

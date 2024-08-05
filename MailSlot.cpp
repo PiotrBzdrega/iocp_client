@@ -131,7 +131,7 @@ namespace MailSlot
 
         if (INVALID_HANDLE_VALUE != hMailslot) 
         {
-            std::printf("\nCreateFile() was successful.");
+            std::printf("\nCreateFile() was successful.\n");
             return hMailslot;
         }
         else

@@ -7,7 +7,8 @@
     constexpr auto lockName="/var/run/client.pid";
 #elif _WIN32
 #include "windows.h"
-    constexpr auto lockName=L"Global\\FirstInstance";
+#include "WSAErrors.h"
+    constexpr auto lockName=L"FirstInstance";
 #endif
 
 
@@ -59,7 +60,32 @@ namespace COM
             
             isParent = (rc == 0);    
 #elif _WIN32
-            _handle=CreateMutexW(NULL,FALSE,lockName);
+
+            // Open the file
+            _handle = CreateFileW(
+            lockName,                           // file to open
+            GENERIC_READ | GENERIC_WRITE,       // open for reading and writing
+            0,                                  // do not share
+            NULL,                               // default security
+            CREATE_NEW,                         // creates a new file, only if it does not already exist.
+            FILE_ATTRIBUTE_HIDDEN,              // normal file
+            NULL);                              // no attr. template
+
+            if (_handle == INVALID_HANDLE_VALUE) 
+            {
+                throw std::runtime_error("CreateFile " + WSA::ErrToString(GetLastError()) );
+            }
+
+            // // Lock the file
+            // bResult = LockFileEx(
+            // hFile,                      // handle to file
+            // LOCKFILE_EXCLUSIVE_LOCK,    // exclusive access
+            // 0,                          // reserved, must be zero
+            // MAXDWORD,                   // number of bytes to lock (low order)
+            // MAXDWORD,                   // number of bytes to lock (high order)
+            // &ol);                       // overlapped structure
+
+            // _handle=CreateMutexW(NULL,TRUE,lockName);
             isParent=_handle != nullptr;
 #endif
         }
