@@ -11,7 +11,7 @@
 #include <thread>
 #include <cstdlib>
 
-inline constexpr wchar_t* ms_default_name=L"\\\\.\\mailslot\\ms_instance";
+inline constexpr auto ms_default_name="\\\\.\\mailslot\\ms_instance";
 // constexpr wchar_t* change(const char* name)
 // {
 //     return std::mbstowcs(name,)
@@ -25,9 +25,9 @@ namespace MailSlot
      {
      private:
           HANDLE _handle{nullptr};
-          HANDLE init(const wchar_t* ms_name);
+          HANDLE init(const char* ms_name);
      public:
-          Sender(const wchar_t* ms_name = ms_default_name);
+          Sender(const char* ms_name = ms_default_name);
           int write(const std::string &message); //TODO: check, maybe std::string_view will be better
      };
 
@@ -36,11 +36,11 @@ namespace MailSlot
      private:
           HANDLE _handle{nullptr};
           std::thread read_thr;
-          HANDLE init(const wchar_t* ms_name);
+          HANDLE init(const char* ms_name);
           void read(std::function<void(std::string_view)> callback);
           void join();
      public:
-          Receiver(std::function<void(std::string_view)> callback, const wchar_t* ms_name = ms_default_name);
+          Receiver(std::function<void(std::string_view)> callback, const char* ms_name = ms_default_name);
           ~Receiver();
      };
 }

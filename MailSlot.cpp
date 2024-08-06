@@ -9,7 +9,7 @@
 
 namespace MailSlot
 {
-    Receiver::Receiver(std::function<void(std::string_view)> callback, const wchar_t* ms_name)
+    Receiver::Receiver(std::function<void(std::string_view)> callback, const char* ms_name)
     {
         _handle = init(ms_name);
 
@@ -36,17 +36,17 @@ namespace MailSlot
         }
     }
 
-    inline HANDLE Receiver::init(const wchar_t* ms_name)
+    inline HANDLE Receiver::init(const char* ms_name)
     {
         // Create a mailslot
-        HANDLE hMailslot = CreateMailslotW(ms_name,
+        HANDLE hMailslot = CreateMailslotA(ms_name,
                                     0, // no limitation of maximum message size
                                     MAILSLOT_WAIT_FOREVER, // no time-out
                                     NULL); // default security attributes
 
         if (INVALID_HANDLE_VALUE != hMailslot) 
         {
-            std::printf("\nCreateMailslot() was successful.");
+            std::printf("\nCreateMailslot() was successful.\n");
             return hMailslot;
         }
         else
@@ -105,13 +105,13 @@ namespace MailSlot
         
     }
 
-    Sender::Sender(const wchar_t*  ms_name)
+    Sender::Sender(const char*  ms_name)
     {
         _handle = init(ms_name);
 
     }
 
-    inline HANDLE Sender::init(const wchar_t* ms_name)
+    inline HANDLE Sender::init(const char* ms_name)
     {
 
         // /* wchar_t* to char* */
@@ -119,7 +119,7 @@ namespace MailSlot
 
 
         // Open a handle to the mailslot
-        HANDLE hMailslot = CreateFileW(
+        HANDLE hMailslot = CreateFileA(
             ms_name, // Mailslot name
             GENERIC_WRITE,                       // Write access
             FILE_SHARE_READ,                     // Shared read access

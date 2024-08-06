@@ -9,7 +9,7 @@
 
 inline constexpr auto DATA_BUFSIZE = 8192;
 
-enum ASYNC_TYPE { RECV,SEND,CONNECT,DISCONNECT};
+enum ASYNC_TYPE { RECV,SEND,CONNECT,EXTERNAL};
 
 class DataContext
 {

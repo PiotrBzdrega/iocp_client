@@ -1,6 +1,7 @@
 #include <iostream>
 #include <cstring> //std::memset
 #include <vector>
+// #include <memory> //std::shared_ptr
 
 #include "WinSockInit.h"
 #include "DataContext.h"
@@ -70,10 +71,11 @@ https://stackoverflow.com/a/3665240/17493620
 
 */
 
-void readFunction(std::string_view mail)
+struct CustomOv
 {
-    std::cout<<mail<<"\n";
-}
+    OVERLAPPED overlapped;
+    std::string_view msg;
+};
 
 int main()
 {
@@ -88,13 +90,6 @@ int main()
         mailSender.write("New message");
         return EXIT_SUCCESS;
     }
-    MailSlot::Receiver mailReceiver(readFunction);
-
-    /* Initialize WinSock*/
-    auto& winsock = WinSock::instance();
-
-    /* IOCP singlton instance */
-    // auto& iocp = IOCP::IOCP::instance(); //TODO: find best design 
 
     /* Creates an input/output (I/O) completion port w/o reference to socket */
     HANDLE IOCP_handle = CreateIoCompletionPort( INVALID_HANDLE_VALUE,NULL, 0, 0);
@@ -103,6 +98,32 @@ int main()
         std::cout<<"CreateIoCompletionPort: "<<WSA::ErrToString(GetLastError())<<"\n";
         return EXIT_FAILURE;
     }
+
+    MailSlot::Receiver mailReceiver(
+        [IOCP_handle](std::string_view mail)
+        {
+            CustomOv* ov = new CustomOv();
+            ZeroMemory(ov, sizeof(CustomOv));
+            ov->msg=mail;
+
+            std::cout<<mail<<"\n";
+            if (!PostQueuedCompletionStatus(IOCP_handle, 0, 0, (LPOVERLAPPED)&ov->overlapped))
+            {
+                auto err = GetLastError();
+                if (err != ERROR_IO_PENDING)
+                {
+                    std::cerr << "PostQueuedCompletionStatus failed: "<<WSA::ErrToString(err)<<"\n";
+                }
+            }        
+        });
+
+    /* Initialize WinSock*/
+    auto& winsock = WinSock::instance();
+
+    /* IOCP singlton instance */
+    // auto& iocp = IOCP::IOCP::instance(); //TODO: find best design 
+
+
 
     // Create a socket
     SOCKET clientSocket = WSASocket(AF_INET, SOCK_STREAM, IPPROTO_TCP, NULL, 0, WSA_FLAG_OVERLAPPED);
@@ -227,7 +248,6 @@ int main()
             return EXIT_FAILURE;
         }
     }
-
 
     // /* to ensure all fields are set to default values (0 or NULL for pointers) */    
     // struct addrinfo hints = {0}; 
@@ -359,7 +379,29 @@ int main()
             but is useful to use in combination with PostQueuedCompletionStatus 
             as a way of indicating to threads that they should terminate. */
         }
-        
+
+        if (context == nullptr && lpOverlapped)
+        {
+            // CustomOv* ov = reinterpret_cast<CustomOv*>(lpOverlapped);
+            CustomOv* ov = CONTAINING_RECORD(lpOverlapped,CustomOv,overlapped);
+
+            context->prepareSend(ov->msg);
+            if(WSASend(context->socket, &context->wsabuf[SEND], 1, nullptr, 0, &context->overlapped[SEND], nullptr)== SOCKET_ERROR)
+            {
+                int err;
+                if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
+                    std::cerr << "WSASend failed: " << WSA::ErrToString(err) << "\n";
+                    shutdown(context->socket,SD_BOTH);
+                    closesocket(context->socket);
+                    /* release completion port */
+                    CloseHandle(IOCP_handle);
+                    return EXIT_FAILURE;
+                }
+            }
+
+            delete ov;
+            
+        }
 
 
         if (&context->overlapped[CONNECT]==lpOverlapped)
@@ -439,6 +481,8 @@ int main()
     }
 
     // closesocket(clientSocket);
+
+    delete clientContext;
 
     /* release completion port */
     CloseHandle(IOCP_handle);

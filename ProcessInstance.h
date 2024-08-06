@@ -8,7 +8,7 @@
 #elif _WIN32
 #include "windows.h"
 #include "WSAErrors.h"
-    constexpr auto lockName=L"FirstInstance";
+    constexpr auto lockName="FirstInstance.lck";
 #endif
 
 
@@ -62,7 +62,7 @@ namespace COM
 #elif _WIN32
 
             // Open the file
-            _handle = CreateFileW(
+            _handle = CreateFileA(
             lockName,                           // file to open
             GENERIC_READ | GENERIC_WRITE,       // open for reading and writing
             0,                                  // do not share
@@ -71,10 +71,10 @@ namespace COM
             FILE_ATTRIBUTE_HIDDEN | FILE_FLAG_DELETE_ON_CLOSE,              // normal file and close on delete
             NULL);                              // no attr. template
 
-            // if (_handle == INVALID_HANDLE_VALUE) 
-            // {
-            //     throw std::runtime_error("CreateFile " + WSA::ErrToString(GetLastError()) );
-            // }
+            if (_handle == INVALID_HANDLE_VALUE) 
+            {
+                std::cout<<"CreateFile " + WSA::ErrToString(GetLastError()) <<"\n";
+            }
 
             isParent=_handle != INVALID_HANDLE_VALUE;
 #endif
