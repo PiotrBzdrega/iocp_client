@@ -67,26 +67,16 @@ namespace COM
             GENERIC_READ | GENERIC_WRITE,       // open for reading and writing
             0,                                  // do not share
             NULL,                               // default security
-            CREATE_NEW,                         // creates a new file, only if it does not already exist.
-            FILE_ATTRIBUTE_HIDDEN,              // normal file
+            CREATE_ALWAYS,                      // Creates a new file, always. If the specified file exists and is writable, the function truncates the file
+            FILE_ATTRIBUTE_HIDDEN | FILE_FLAG_DELETE_ON_CLOSE,              // normal file and close on delete
             NULL);                              // no attr. template
 
-            if (_handle == INVALID_HANDLE_VALUE) 
-            {
-                throw std::runtime_error("CreateFile " + WSA::ErrToString(GetLastError()) );
-            }
+            // if (_handle == INVALID_HANDLE_VALUE) 
+            // {
+            //     throw std::runtime_error("CreateFile " + WSA::ErrToString(GetLastError()) );
+            // }
 
-            // // Lock the file
-            // bResult = LockFileEx(
-            // hFile,                      // handle to file
-            // LOCKFILE_EXCLUSIVE_LOCK,    // exclusive access
-            // 0,                          // reserved, must be zero
-            // MAXDWORD,                   // number of bytes to lock (low order)
-            // MAXDWORD,                   // number of bytes to lock (high order)
-            // &ol);                       // overlapped structure
-
-            // _handle=CreateMutexW(NULL,TRUE,lockName);
-            isParent=_handle != nullptr;
+            isParent=_handle != INVALID_HANDLE_VALUE;
 #endif
         }
         ~ProcessInstance()
