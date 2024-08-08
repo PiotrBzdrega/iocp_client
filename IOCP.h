@@ -1,6 +1,8 @@
 #pragma once
 #include <windows.h>
 #include <vector>
+#include <thread>
+#include <memory> //std::shared_ptr
 
 #include "ServerContext.h"
 
@@ -9,25 +11,13 @@ namespace IOCP
     class IOCP
     {
     private:
-        /* to create only once in instance() */
-        IOCP();
         static HANDLE _handle;
-        static std::vector<ServerContext> _endpoints;
-        
+        // static std::vector<ServerContext> _endpoints;
+        std::thread _completionThread;
+        void waitForCompletion();
     public:        
-        IOCP(const IOCP&) = delete;
-        IOCP& operator=(const IOCP&) = delete;
-        IOCP(IOCP&&) = delete;
-        IOCP& operator=(IOCP&&) = delete;
-        ~IOCP();
-
-        inline static IOCP& instance()
-        {
-            static IOCP inst;
-            return inst;
-        };
-
-        static int associateHandle(ServerContext serCtx);        
+        IOCP();
+        int associateHandle(ServerContext* completionKey);        
     };
 }
 

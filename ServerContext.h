@@ -7,36 +7,32 @@
 #include <mswsock.h>  //LPFN_CONNECTEX
 
 #include "IOCP.h"
-#include "IPeer.h"
+#include "IServer.h"
 
 namespace IOCP
 {
 
     constexpr auto BUFSIZE = 1024;
-    inline constexpr auto ASYNC_RW=2;
-    inline constexpr auto ASYNC_TYPES=3;
-    enum ASYNC_TYPE { RECV,SEND,CONNECT};
+    enum ASYNC_TYPE { RECV=0,SEND,CONNECT};
 
-    struct AsyncResult
-    {
-        OVERLAPPED overlapped;
-        DWORD error;
-        ServerContext *context;
-    };
+    // struct AsyncResult
+    // {
+    //     OVERLAPPED overlapped;
+    //     DWORD error;
+    //     ServerContext *context;
+    // };
 
-    class ServerContext : public IPeer
+    class ServerContext : public IServer
     {
     public:
         ServerContext(std::string ip, uint16_t port);
-        std::string _locip;
-        uint16_t _locport;
-        SOCKET socket;
-        std::array<char[BUFSIZE],ASYNC_RW> _buffer;
-        std::array<WSABUF,ASYNC_RW> _asyncBuffer;
-        std::array<AsyncResult,ASYNC_TYPES> _asyncRes;
+        std::array<char[BUFSIZE],2> _buffer;
+        std::array<WSABUF,2> _asyncBuffer;
+        std::array<OVERLAPPED,3> _ov;
+        void processCompletionStatus(LPOVERLAPPED ov) override;
     private:
         inline static LPFN_CONNECTEX ConnectEx{nullptr};
-
+        void getConnectFunc();
         void bondAsync();
         void connect();
         void disconnect();

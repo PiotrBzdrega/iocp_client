@@ -1,13 +1,24 @@
 #include "ServerContext.h"
 
-IOCP::ServerContext::ServerContext(std::string ip, uint16_t port) : _ip(ip), _port(port)
+IOCP::ServerContext::ServerContext(std::string ip, uint16_t port) : _locip(ip), _locport(port)
 {
     bondAsync();
 
 }
 
+void IOCP::ServerContext::processCompletionStatus(LPOVERLAPPED ov)
+{
+}
+
+void IOCP::ServerContext::getConnectFunc()
+{
+}
+
 void IOCP::ServerContext::bondAsync()
 {
+    if(ConnectEx)
+
+
     /* assign pointer to the current object instance */
     for (auto &i : _asyncRes)
     {

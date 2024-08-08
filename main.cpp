@@ -372,111 +372,113 @@ int main()
                 return EXIT_FAILURE;
             }
         }
-
-        if (!lpOverlapped)
+        else
         {
-            /* This condition doesn't happen due to IO requests, 
-            but is useful to use in combination with PostQueuedCompletionStatus 
-            as a way of indicating to threads that they should terminate. */
-        }
-
-        if (context == nullptr && lpOverlapped)
-        {
-            // CustomOv* ov = reinterpret_cast<CustomOv*>(lpOverlapped);
-            CustomOv* ov = CONTAINING_RECORD(lpOverlapped,CustomOv,overlapped);
-
-            context->prepareSend(ov->msg);
-            if(WSASend(context->socket, &context->wsabuf[SEND], 1, nullptr, 0, &context->overlapped[SEND], nullptr)== SOCKET_ERROR)
+            if (!lpOverlapped)
             {
-                int err;
-                if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
-                    std::cerr << "WSASend failed: " << WSA::ErrToString(err) << "\n";
-                    shutdown(context->socket,SD_BOTH);
-                    closesocket(context->socket);
-                    /* release completion port */
-                    CloseHandle(IOCP_handle);
-                    return EXIT_FAILURE;
+                /* This condition doesn't happen due to IO requests, 
+                but is useful to use in combination with PostQueuedCompletionStatus 
+                as a way of indicating to threads that they should terminate. */
+            }
+
+            if (context == nullptr && lpOverlapped)
+            {
+                // CustomOv* ov = reinterpret_cast<CustomOv*>(lpOverlapped);
+                CustomOv* ov = CONTAINING_RECORD(lpOverlapped,CustomOv,overlapped);
+
+                context->prepareSend(ov->msg);
+                if(WSASend(context->socket, &context->wsabuf[SEND], 1, nullptr, 0, &context->overlapped[SEND], nullptr)== SOCKET_ERROR)
+                {
+                    int err;
+                    if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
+                        std::cerr << "WSASend failed: " << WSA::ErrToString(err) << "\n";
+                        shutdown(context->socket,SD_BOTH);
+                        closesocket(context->socket);
+                        /* release completion port */
+                        CloseHandle(IOCP_handle);
+                        return EXIT_FAILURE;
+                    }
+                }
+
+                delete ov;
+
+            }
+
+            if (&context->overlapped[CONNECT]==lpOverlapped)
+            {
+               std::cout<<"connected\n";
+                /*
+                Previously set socket options or attributes are not automatically copied to the connected socket. 
+                To do so, the application must call SO_UPDATE_CONNECT_CONTEXT on the socket after the connection is established.
+                */
+               setsockopt(context->socket, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, NULL, 0);
+
+                context->prepareSend("Welcome from client side");
+                if(WSASend(context->socket, &context->wsabuf[SEND], 1, nullptr, 0, &context->overlapped[SEND], nullptr)== SOCKET_ERROR)
+                {
+                    int err;
+                    if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
+                        std::cerr << "WSASend failed: " << WSA::ErrToString(err) << "\n";
+                        shutdown(context->socket,SD_BOTH);
+                        closesocket(context->socket);
+                        /* release completion port */
+                        CloseHandle(IOCP_handle);
+                        return EXIT_FAILURE;
+                    }
                 }
             }
 
-            delete ov;
-            
-        }
-
-
-        if (&context->overlapped[CONNECT]==lpOverlapped)
-        {
-           std::cout<<"connected\n";
-            /*
-            Previously set socket options or attributes are not automatically copied to the connected socket. 
-            To do so, the application must call SO_UPDATE_CONNECT_CONTEXT on the socket after the connection is established.
-            */
-           setsockopt(context->socket, SOL_SOCKET, SO_UPDATE_CONNECT_CONTEXT, NULL, 0);
-
-            context->prepareSend("Welcome from client side");
-            if(WSASend(context->socket, &context->wsabuf[SEND], 1, nullptr, 0, &context->overlapped[SEND], nullptr)== SOCKET_ERROR)
+            if (&context->overlapped[SEND]==lpOverlapped)
             {
-                int err;
-                if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
-                    std::cerr << "WSASend failed: " << WSA::ErrToString(err) << "\n";
-                    shutdown(context->socket,SD_BOTH);
-                    closesocket(context->socket);
-                    /* release completion port */
-                    CloseHandle(IOCP_handle);
-                    return EXIT_FAILURE;
+                std::cout<<"sent\n";
+                context->prepareRecv();
+
+                // Post an asynchronous read operation
+                DWORD flags = 0;
+                if (WSARecv(context->socket, &context->wsabuf[RECV], 1, &context->bytesReceived, &flags, &context->overlapped[RECV], nullptr) == SOCKET_ERROR) 
+                {
+                    int err;
+                    if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
+                        std::cerr << "WSARecv failed: " << WSA::ErrToString(err) << "\n";
+                        shutdown(context->socket,SD_BOTH);
+                        closesocket(context->socket);
+                        /* release completion port */
+                        CloseHandle(IOCP_handle);
+                        return EXIT_FAILURE;
+                    }
                 }
             }
-        }
 
-        if (&context->overlapped[SEND]==lpOverlapped)
-        {
-            std::cout<<"sent\n";
-            context->prepareRecv();
-
-            // Post an asynchronous read operation
-            DWORD flags = 0;
-            if (WSARecv(context->socket, &context->wsabuf[RECV], 1, &context->bytesReceived, &flags, &context->overlapped[RECV], nullptr) == SOCKET_ERROR) 
+            if (&context->overlapped[RECV]==lpOverlapped)
             {
-                int err;
-                if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
-                    std::cerr << "WSARecv failed: " << WSA::ErrToString(err) << "\n";
+                std::cout<<"read\n";
+
+                if(BytesTransferred==0)
+                {
                     shutdown(context->socket,SD_BOTH);
                     closesocket(context->socket);
-                    /* release completion port */
-                    CloseHandle(IOCP_handle);
-                    return EXIT_FAILURE;
+                    break;
+                }
+
+                std::cout<<std::string(context->buffer[RECV],BytesTransferred)<<"\n";
+
+                context->prepareRecv();
+                // Post an asynchronous read operation
+                DWORD flags = 0;
+                if (WSARecv(context->socket, &context->wsabuf[RECV], 1, &context->bytesReceived, &flags, &context->overlapped[RECV], nullptr) == SOCKET_ERROR) 
+                {
+                    int err;
+                    if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
+                        std::cerr << "WSARecv failed: " << WSA::ErrToString(err) << "\n";
+                        shutdown(context->socket,SD_BOTH);
+                        closesocket(context->socket);
+                        /* release completion port */
+                        CloseHandle(IOCP_handle);
+                        return EXIT_FAILURE;
+                    }
                 }
             }
-        }
 
-        if (&context->overlapped[RECV]==lpOverlapped)
-        {
-            std::cout<<"read\n";
-
-            if(BytesTransferred==0)
-            {
-                shutdown(context->socket,SD_BOTH);
-                closesocket(context->socket);
-                break;
-            }
-
-            std::cout<<std::string(context->buffer[RECV],BytesTransferred)<<"\n";
-
-            context->prepareRecv();
-            // Post an asynchronous read operation
-            DWORD flags = 0;
-            if (WSARecv(context->socket, &context->wsabuf[RECV], 1, &context->bytesReceived, &flags, &context->overlapped[RECV], nullptr) == SOCKET_ERROR) 
-            {
-                int err;
-                if ( (err = WSAGetLastError()) != WSA_IO_PENDING) {
-                    std::cerr << "WSARecv failed: " << WSA::ErrToString(err) << "\n";
-                    shutdown(context->socket,SD_BOTH);
-                    closesocket(context->socket);
-                    /* release completion port */
-                    CloseHandle(IOCP_handle);
-                    return EXIT_FAILURE;
-                }
-            }
         }      
     }
 
